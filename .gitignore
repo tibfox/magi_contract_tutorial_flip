@@ -1,0 +1,11 @@
+build/
+artifacts/
+test/artifacts/
+test/data/
+data/
+*.wasm
+.cache/
+.gocache/
+.vscode/
+.config/
+go/
