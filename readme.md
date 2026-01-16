@@ -61,12 +61,12 @@ sequenceDiagram
 
 ## Part 1: Cloning template
 
-The Magi network provides an up-to-date [contract template](https://github.com/vsc-eco/go-contract-template) you can clone for your starting point. In this tutorial I will not go into details about it here as I assume you clone my [tutorial repo instead](). 
+The Magi network provides an up-to-date [contract template](https://github.com/vsc-eco/go-contract-template) you can clone for your starting point. In this tutorial I will not go into details about it here as I assume you clone my [tutorial repo instead](https://github.com/tibfox/magi_contract_tutorial_flip). 
 
 
 ## Part 1: Understanding the SDK
 
-The SDK provides the interface between your contract and the Magi network. Let's examine the key components.
+The SDK provides the interface between your contract and the Magi network. Make sure to always have the current sdk when developing a contract. Let's examine the key components of this folder.
 
 ### Environment Context
 
@@ -90,7 +90,7 @@ type Env struct {
 }
 ```
 
-The `Sender` contains authentication details:
+The `Sender` contains authentication details but usually `Sender.Address` is enough for verifying permissions in your contract.
 
 ```go
 type Sender struct {
@@ -120,15 +120,20 @@ sdk.StateGetObject(key string) *string   // Retrieve a value
 sdk.StateDeleteObject(key string)        // Remove a value
 ```
 
+It is important to mention here that `sdk.StateSetObject()` is the most expensive single-call of the current system. Be mindful of that and try to allocate contract state as early as possible if you know how the state value will look like. Updates will become cheaper this way. Also try to minimize state value length by implementing mappings of known values (states, types and this kind of stuff) so you only store integers instead of whole strings. There are many ways to improve state usage but this depends highly on your use-case. For the sake of simplicity I am not going into detail in the tutorial.
+
 **Logging:**
 ```go
-sdk.Log(message string)  // Emit an event log
+sdk.Log(message string)  // Emit an log
 ```
+
+This method is also used to emit event logs for external indexers. More on that later.
 
 **Transaction Control:**
 ```go
 sdk.Abort(msg string)           // Hard abort
 ```
+This will revert the whole transaction, revert fund movements and state writes. It is smart to abort as early as possible to minimize ressources when the call fails.
 
 **Asset Operations:**
 ```go
@@ -137,12 +142,15 @@ sdk.HiveDraw(amount int64, asset Asset)           // Pull from caller
 sdk.HiveTransfer(to Address, amount int64, asset Asset)  // Send from contract
 sdk.HiveWithdraw(to Address, amount int64, asset Asset)  // Unmap to Hive account
 ```
+`sdk.GetBalance()`, `sdk.HiveDraw()` and `sdk.HiveTransfer()` are all operating on Magi itself while `sdk.HiveWithdraw()` will send funds from the contract to the receiver on the Hive blockchain.
 
 **Cross-Contract Calls:**
 ```go
 sdk.ContractStateGet(contractId, key string) *string
 sdk.ContractCall(contractId, method, payload string, options *ContractCallOptions) *string
 ```
+
+These are super powerful tools where you can chain execute up to 20 contracts. For example you could create a task market platform and contract that calls my [escrow contract](https://ecency.com/hive-139531/@tibfox/kinoko-escrow-trust-made-simple) in order to create a secure trustless payment acknoledgement between two parties. No need to implement your own logic.
 
 ---
 
@@ -160,6 +168,8 @@ func main() {
 }
 ```
 
+For super small contracts it is enough if you only have one main.go file but I try to split my contract in a reasonable structure of multiple files. It is up to you but at least 1 `main.go` with the `main()` needs to exist for your contract.
+
 ### Exporting Functions
 
 Use the `//go:wasmexport` directive to expose functions to the network:
@@ -171,7 +181,7 @@ func Flip(payload *string) *string {
 }
 ```
 
-Functions receive and return string pointers. The payload contains whatever the caller passed in.
+These functions are the ones the users of your contract will interact with. They receive and return only one string pointer each. No int or multiple arguments - just one string in and one string out.
 
 ### Implementing the Flip Function
 
@@ -243,7 +253,7 @@ Logs are useful for off-chain indexers and debugging. There is no official index
 
 ### The Randomization Logic
 
-The `random.go` file contains the shuffling implementation:
+The `random.go` file contains the shuffling implementation using the Fisher-Yates shuffle. I just copied it from somewhere and ported it to go. It is super simple and determistic.
 
 ```go
 func generateSeed(blockHeight uint64, index uint64, opIndex uint64) uint64 {
@@ -273,10 +283,6 @@ func shuffleWithSeed(items []string, seed uint64) []string {
 }
 ```
 
-This uses:
-- **LCG (Linear Congruential Generator)**: A simple PRNG with parameters from Numerical Recipes
-- **Fisher-Yates shuffle**: Produces an unbiased permutation
-
 ---
 
 ## Part 3: Testing
@@ -291,7 +297,7 @@ This will place the compiled main.wasm file in the `test/artifacts` folder.
 
 ### Running Tests
 
-Tests use the `vsc-node` test utilities which provide a mock environment:
+Tests use the `go-vsc-node` [test utilities](https://github.com/vsc-eco/go-vsc-node/tree/main/lib/test_utils) which provide a mock environment:
 
 ```go
 package test
@@ -400,7 +406,7 @@ The compiled `.wasm` file goes in the `artifacts/` directory.
 
 ### Using Docker (Recommended)
 
-For reproducible builds and source code verification on block explorers:
+For reproducible builds and source code verification (see more on that below) defintely use this:
 
 ```bash
 docker pull tinygo/tinygo:0.39.0
@@ -411,7 +417,7 @@ docker run --rm -v $(pwd):/home/tinygo tinygo/tinygo:0.39.0 \
 
 ### Optimizing Binary Size
 
-Strip metadata to reduce file size before deployment:
+Strip metadata to reduce file size before deployment (also mandatory for contract verification):
 
 ```bash
 # Using Wabt
@@ -425,12 +431,21 @@ wasm-tools strip -o artifacts/main-stripped.wasm artifacts/main.wasm
 
 ## Part 5: Deployment
 
-Once tested, deploy your contract to the network using the `vsc-contract-deploy` CLI tool.
+Once tested, deploy your contract to the network using the `vsc-contract-deploy` CLI tool. 
 
 ### Prerequisites
 
 - A Hive account with at least **10 HBD** (deployment fee per contract)
 - Your Hive active key
+- `vsc-contract-deploy` needs to be built by you: 
+
+```git clone https://github.com/vsc-eco/go-vsc-node
+cd go-vsc-node
+go mod download
+go build -buildvcs=false -o vsc-contract-deploy vsc-node/cmd/contract-deployer
+```
+
+This will generate an program called `vsc-contract-deploy` in the root folder. For the upcoming commands I assume that you placed it in your PATH directory like /usr/bin on Linux for example.
 
 ### Step 1: Initialize Configuration
 
@@ -438,7 +453,7 @@ Once tested, deploy your contract to the network using the `vsc-contract-deploy`
 vsc-contract-deploy -init
 ```
 
-This creates `data/config/identityConfig.json`. Edit it with your credentials:
+This creates `data/config/identityConfig.json`. Edit it with your Hive username and active key:
 
 ```json
 {
@@ -460,14 +475,13 @@ The CLI will:
 
 ### Deployment Cost
 
-There is a deployment fee of **10 HBD** per contract, paid from your Hive account balance.
+There is a deployment fee of **10 HBD** per contract, paid from your **Hive account** balance. This fee is needed to secure the system and let people think twice before deploying unfinished contracts. I learned that the hard way ;) 
 
 ---
 
 ## Part 6: Calling Your Deployed Contract
 
-Once deployed, you can interact with your contract using the [Magi Block Explorer](https://vsc.techcoderx.com).
-Go on "Blockchain" -> "Contracts" -> select your contract -> Tab "Call Contract"
+Once deployed, you can interact with your contract using the contrat page of [Magi Blocks](https://vsc.techcoderx.com/contracts).  Select your newly deployed contract and open the tab "Call Contract". Enter the following parameters:
 
 |Field|Input|
 |-|-|
@@ -486,26 +500,16 @@ Hit "Call Contract" and go back to "Transactions" - there you should see your se
 
 ## Part 7: Verifying Your Contract
 
-To allow others to inspect your contract's source code, verify it on the [Magi Block Explorer](https://vsc.techcoderx.com).
+To allow others to inspect your contract's source code, verify it on the [Magi Blocks](https://vsc.techcoderx.com).
 
-For this our code needs to be published as public github repository. Also the source code needs to be the same as your deployed version.
+For this our code needs to be published as public github repository. Also the source code needs to be 100% the same as your deployed version. The contract verifier will download and build your contract. Then it will uses the wasm tools you have selected to strip the wasm file. It is **important** that you select the correct versions and tools for the verifier to succeed.
 
 Go on "Tools" -> "Verify Contract" -> read the explainer and hit "Next".
-Enter all the details in there and hit "submit". The contract should get verified if you met all the requirements. If not @techcoderx can help you. 
+Enter all the details in there and hit "submit". The contract should get verified if you met all the requirements. If not @techcoderx can help you as he did help me multiple times. 
 
 
 ---
 
-## Summary
+## We made it!
 
-Building Magi contracts involves:
-
-1. **SDK Integration**: Use the provided SDK for state, logging, and asset operations
-2. **Function Export**: Mark public functions with `//go:wasmexport`
-3. **Input Validation**: Always validate payloads and use `sdk.Abort()` for errors
-4. **State Management**: Store persistent data with `StateSetObject`
-5. **Event Logging**: Emit logs for off-chain tracking with `sdk.Log()`
-6. **Testing**: Use the test utilities to verify behavior before deployment
-7. **Compilation**: Build to WASM with TinyGo
-
-The flip contract demonstrates these patterns in a simple, practical example. Use it as a starting point for more complex contracts!
+Now you have all infos you need in order to build your own smart contracts on the Magi network! There is still plenty to learn for you from the Go language in general, optimization of gas consumption and much much more. It is a fun journey and I am excited about wht you are going to build! If you want your contracts to get featured on okinoko.io - please contact me!
