@@ -389,10 +389,13 @@ Example output:
 
 ## Part 4: Compiling the Contract for Deployment
 
-The command is similar to the test build:
+The command is similar to the test build but we are going to use a **specific tinygo docker image** for reproducible builds and source code verification:
 
 ```bash
-tinygo build -gc=custom -scheduler=none -panic=trap -no-debug -target=wasm-unknown -o artifacts/main.wasm ./contract
+docker pull tinygo/tinygo:0.39.0
+docker run --rm -v $(pwd):/home/tinygo tinygo/tinygo:0.39.0 \
+  tinygo build -gc=custom -scheduler=none -panic=trap -no-debug \
+  -target=wasm-unknown -o artifacts/main.wasm ./contract
 ```
 
 Key flags:
@@ -403,17 +406,6 @@ Key flags:
 - `-no-debug`: Reduces binary size by stripping debug info
 
 The compiled `.wasm` file goes in the `artifacts/` directory.
-
-### Using Docker (Recommended)
-
-For reproducible builds and source code verification (see more on that below) defintely use this:
-
-```bash
-docker pull tinygo/tinygo:0.39.0
-docker run --rm -v $(pwd):/home/tinygo tinygo/tinygo:0.39.0 \
-  tinygo build -gc=custom -scheduler=none -panic=trap -no-debug \
-  -target=wasm-unknown -o artifacts/main.wasm ./contract
-```
 
 ### Optimizing Binary Size
 
