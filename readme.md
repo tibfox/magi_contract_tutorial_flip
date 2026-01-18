@@ -431,7 +431,8 @@ Once tested, deploy your contract to the network using the `vsc-contract-deploy`
 - Your Hive active key
 - `vsc-contract-deploy` needs to be built by you: 
 
-```git clone https://github.com/vsc-eco/go-vsc-node
+```
+git clone https://github.com/vsc-eco/go-vsc-node
 cd go-vsc-node
 go mod download
 go build -buildvcs=false -o vsc-contract-deploy vsc-node/cmd/contract-deployer
