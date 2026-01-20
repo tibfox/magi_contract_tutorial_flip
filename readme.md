@@ -70,7 +70,7 @@ sequenceDiagram
 The Magi network provides an up-to-date [contract template](https://github.com/vsc-eco/go-contract-template) you can clone for your starting point. In this tutorial I will not go into details about it here as I assume you clone my [tutorial repo instead](https://github.com/tibfox/magi_contract_tutorial_flip). 
 
 
-## Part 1: Understanding the SDK
+## Part 2: Understanding the SDK
 
 The SDK provides the interface between your contract and the Magi network. Make sure to always have the current sdk when developing a contract. Let's examine the key components of this folder.
 
@@ -164,7 +164,7 @@ These are super powerful tools where you can chain execute up to 20 contracts. F
 
 ---
 
-## Part 2: Writing the Contract
+## Part 3: Writing the Contract
 
 ### The Main Entry Point
 
@@ -191,9 +191,9 @@ func Flip(payload *string) *string {
 }
 ```
 
-These functions are the ones the users of your contract will interact with. They receive and return only one string pointer each. No int or multiple arguments - just one string in and one string out. 
+These functions are the ones the users of your contract will interact with. They receive and return only one string pointer each. No int or multiple arguments - just one string in and one string out.
 
-For payloads I found out it is the most gass effective if you use delimited strings instead of the common json format. You can do what you want of course but I will continue to stick with csv format and save my end users some gas.
+For payloads, I find that csv (simple delimited strings) is the more gas efficient compared to the commonly known JSON format. JSON needs some overhead in characters, but also a lot of parsing logic in the WASM itself. I did not try the `sdk_tinyjson.go` implementation though.
 
 ### Implementing the Flip Function
 
@@ -322,7 +322,7 @@ There are other ways to find a determistic "random" result but that is the most 
 
 ---
 
-## Part 3: Testing
+## Part 4: Testing
 
 ### Compiling the Contract for Testing
 
@@ -428,7 +428,7 @@ For bigger test files and continous testing it is better to run `go test ./test`
 ---
 
 
-## Part 4: Compiling the Contract for Deployment
+## Part 5: Compiling the Contract for Deployment
 
 The command is similar to the test build but we are going to use a **specific tinygo docker image** for reproducible builds and source code verification:
 
@@ -462,7 +462,7 @@ wasm-tools strip -o artifacts/main-stripped.wasm artifacts/main.wasm
 
 ---
 
-## Part 5: Deployment
+## Part 6: Deployment
 
 Once tested, we can finally deploy our contract to the network. For this we have some requirements: 
 
@@ -517,7 +517,7 @@ For my previous contracts techcoderx took the name for a display name in[Magi Bl
 
 ---
 
-## Part 6: Calling Your Deployed Contract
+## Part 7: Calling Your Deployed Contract
 
 Once deployed, you can interact with your contract using the contract page on [Magi Blocks](https://vsc.techcoderx.com/contracts). Select your newly deployed contract and open the tab "Call Contract". Enter the following parameters:
 
@@ -536,7 +536,7 @@ Hit "Call Contract" and go back to "Transactions" - there you should see your se
 
 ---
 
-## Part 7: Verifying Your Contract
+## Part 8: Verifying Your Contract
 
 To allow others to inspect your contract's source code, verify it on the [Magi Blocks](https://vsc.techcoderx.com).
 
