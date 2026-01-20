@@ -2,10 +2,9 @@
 
 You asked for a Magi contract tutorial from start to finish? I got you!
 
-This tutorial walks through building a smart contract for the Magi network. We'll create a simple "flip" contract that randomly shuffles a list of possibilities - useful for things like random selection, lottery draws, or turn order randomization.
+This tutorial walks through building a smart contract for the Magi network. We'll create a simple "flip" contract that randomly shuffles a list of possible values - useful for things like random selection, lottery draws, or simple day-to-day decisions :D Should I do the dishes? Ask you contract!
 
-Remember that the Magi chain is constantly in development and this tutorial could become outdated pretty soon. Make sure to check the official [contract-template repo](https://github.com/vsc-eco/go-contract-template) and the announcements of the Magi network. Also it is planned that there wwill be an sdk for other languages in near future so keep an eye out for that as well.
-
+Before we jump right in I want to mention that the Magi chain is constantly in development and the tutorial could become outdated pretty soon. Make sure to check the official [contract-template repo](https://github.com/vsc-eco/go-contract-template) and the announcements of the Magi network for all the fresh SDK functions, news and possibilities. Also it is planned that there will be an SDK for other languages in near future so keep an eye out for that as well.
 
 Big thanks to @techcoderx for his work and all the help he offered me while creating my first few contracts. Now let us jump in!
 
@@ -17,6 +16,11 @@ Big thanks to @techcoderx for his work and all the help he offered me while crea
 - Basic understanding of Go programming
 
 ## Project Structure
+
+In the video I will cover the flip contract. You can clone it from: https://github.com/tibfox/magi_contract_tutorial_flip
+I will cover most of below but I will not go in detail about the different SDK functions. That is a topic for another video.
+
+After cloning the tutorial repo you will find this structure:
 
 ```
 magi_contract_tutorial_flip/
@@ -36,6 +40,8 @@ magi_contract_tutorial_flip/
 ```
 
 ## Flow of the contract
+
+Before we start to dive into the code I made this simple diagram to showcase the contract flow:
 
 ```mermaid
 sequenceDiagram
@@ -91,6 +97,8 @@ type Env struct {
 ```
 
 The `Sender` contains authentication details but usually `Sender.Address` is enough for verifying permissions in your contract.
+The `Caller` is who actually called the contract function. That can be a user but also another contract. There can be a chain of up to 20 contracts but the original environment is always persistent so checking permissions can be made on the initial sender of the transaction.
+
 
 ```go
 type Sender struct {
@@ -111,6 +119,8 @@ The network supports multiple address formats:
 | Contract | `contract:` | `contract:abc123` |
 | System | `system:` | `system:rewards` |
 
+For now I personally only made contracts that work with hive addresses and I assume that this list will increase with time.
+
 ### Core SDK Functions
 
 **State Management:**
@@ -120,27 +130,27 @@ sdk.StateGetObject(key string) *string   // Retrieve a value
 sdk.StateDeleteObject(key string)        // Remove a value
 ```
 
-It is important to mention here that `sdk.StateSetObject()` is the most expensive single-call of the current system. Be mindful of that and try to allocate contract state as early as possible if you know how the state value will look like. Updates will become cheaper this way. Also try to minimize state value length by implementing mappings of known values (states, types and this kind of stuff) so you only store integers instead of whole strings. There are many ways to improve state usage but this depends highly on your use-case. For the sake of simplicity I am not going into detail in the tutorial.
+It is important to mention here that `sdk.StateSetObject()` is the most expensive single-call of the current system. Be mindful of that and try to allocate contract state as early as possible if you know how the state value will look like. Updates will become cheaper this way. Also try to minimize state value length by implementing mappings of known values (states, types and this kind of stuff) so you only store integers instead of whole strings. There are many ways to improve state usage but this depends highly on your use-case. Keep an eye out for my upcoming videos/posts about that topic.
 
 **Logging:**
 ```go
 sdk.Log(message string)  // Emit an log
 ```
 
-This method is also used to emit event logs for external indexers. More on that later.
+This method can be used for simple logs but is also used to emit event logs for external indexers. More on that later.
 
 **Transaction Control:**
 ```go
 sdk.Abort(msg string)           // Hard abort
 ```
-This will revert the whole transaction, revert fund movements and state writes. It is smart to abort as early as possible to minimize ressources when the call fails.
+This will revert the whole contract call, revert fund movements and state interactions. It is smart to abort as early as possible to minimize ressources when the call fails and add a reason for the abort in the `msg` of course.
 
 **Asset Operations:**
 ```go
-sdk.GetBalance(address Address, asset Asset) int64
-sdk.HiveDraw(amount int64, asset Asset)           // Pull from caller
-sdk.HiveTransfer(to Address, amount int64, asset Asset)  // Send from contract
-sdk.HiveWithdraw(to Address, amount int64, asset Asset)  // Unmap to Hive account
+sdk.GetBalance(address Address, asset Asset) int64 // read the balance of a Magi address
+sdk.HiveDraw(amount int64, asset Asset)           // Pull funds from the **caller**
+sdk.HiveTransfer(to Address, amount int64, asset Asset)  // Sends funds from the contract
+sdk.HiveWithdraw(to Address, amount int64, asset Asset)  // Unmap to Hive account 
 ```
 `sdk.GetBalance()`, `sdk.HiveDraw()` and `sdk.HiveTransfer()` are all operating on Magi itself while `sdk.HiveWithdraw()` will send funds from the contract to the receiver on the Hive blockchain.
 
@@ -150,7 +160,7 @@ sdk.ContractStateGet(contractId, key string) *string
 sdk.ContractCall(contractId, method, payload string, options *ContractCallOptions) *string
 ```
 
-These are super powerful tools where you can chain execute up to 20 contracts. For example you could create a task market platform and contract that calls my [escrow contract](https://ecency.com/hive-139531/@tibfox/kinoko-escrow-trust-made-simple) in order to create a secure trustless payment acknoledgement between two parties. No need to implement your own logic.
+These are super powerful tools where you can chain execute up to 20 contracts. For example you could create a task market platform/contract that calls my [escrow contract](https://ecency.com/hive-139531/@tibfox/kinoko-escrow-trust-made-simple) in order to create a secure trustless payment acknoledgement between two parties. No need to implement your own logic here. Also the contract we cover here can be used to find a random value out of multiple ones. You could just call this contract and save space/time for your own logic.
 
 ---
 
@@ -168,7 +178,7 @@ func main() {
 }
 ```
 
-For super small contracts it is enough if you only have one main.go file but I try to split my contract in a reasonable structure of multiple files. It is up to you but at least 1 `main.go` with the `main()` needs to exist for your contract.
+For super small contracts it is enough if you only have one main.go file but I try to split my contract in a reasonable structure of multiple files. It is up to you but at least 1the `main.go` with the `main()` needs to exist for your contract.
 
 ### Exporting Functions
 
@@ -181,7 +191,9 @@ func Flip(payload *string) *string {
 }
 ```
 
-These functions are the ones the users of your contract will interact with. They receive and return only one string pointer each. No int or multiple arguments - just one string in and one string out.
+These functions are the ones the users of your contract will interact with. They receive and return only one string pointer each. No int or multiple arguments - just one string in and one string out. 
+
+For payloads I found out it is the most gass effective if you use delimited strings instead of the common json format. You can do what you want of course but I will continue to stick with csv format and save my end users some gas.
 
 ### Implementing the Flip Function
 
@@ -190,6 +202,7 @@ Let's break down the flip contract step by step:
 **Step 1: Validate Input**
 
 ```go
+//go:wasmexport flip
 func Flip(payload *string) *string {
     if payload == nil || *payload == "" {
         sdk.Abort("payload is required")
@@ -203,7 +216,7 @@ func Flip(payload *string) *string {
     }
 ```
 
-Always validate inputs early. Use `sdk.Abort()` with a descriptive message.
+Always validate inputs early and use `sdk.Abort()` with a descriptive message.
 
 **Step 2: Get Execution Context**
 
@@ -211,6 +224,10 @@ Always validate inputs early. Use `sdk.Abort()` with a descriptive message.
     env := sdk.GetEnv()
     sender := env.Sender.Address.String()
 ```
+
+As described aboe the `sdk.GetEnv()` will give you all values of the current execution environment. If you only need one value it is better gas wise if you use `sdk.getEnvKey()`.
+
+
 
 **Step 3: Generate Deterministic Randomness**
 
@@ -221,7 +238,9 @@ Always validate inputs early. Use `sdk.Abort()` with a descriptive message.
 
 The seed combines block height, transaction index, and operation index. This ensures:
 - Same input in same transaction position = same output (deterministic)
-- Different transactions = different output (unique per call)
+- Different call = different output (unique per call)
+
+These operations need to be determistic so every witness will receive the exact same result. This is important - otherwise the call will fail.
 
 **Step 4: Store the Result**
 
@@ -234,6 +253,9 @@ The seed combines block height, transaction index, and operation index. This ens
     sdk.StateSetObject(storageKey, result)
 ```
 
+In the current use-case a state write is not needed (and will cost gas without a reason) but I kept it in the code so you will have an example.
+
+
 **Step 5: Emit Event Log**
 
 ```go
@@ -241,7 +263,18 @@ The seed combines block height, transaction index, and operation index. This ens
     sdk.Log(logMessage)
 ```
 
-Logs are useful for off-chain indexers and debugging. There is no official indexer available yet but if you follow the same structire I can add your contract to my personal build and help you provide user friendly data for your own UI.
+Logs are useful for off-chain indexers and debugging. There is no official magi indexer available yet but if you follow the same structure I can add your contract to my personal build and help you provide user friendly data for your own UI.
+
+This is especially useful if you want to query values just like: 
+- all flips of hive:tibfox
+- all flips that had only two results
+- all flips from the past 2 weeks
+- etc.
+
+This structure works the best with my build: 
+prefix;key1:value1;key2:value2;...
+
+The `;` is up to you and also if you want to add keys or not. Just get in contact with me and I can tell what is possible.
 
 **Step 6: Return Result**
 
@@ -250,6 +283,8 @@ Logs are useful for off-chain indexers and debugging. There is no official index
     return &returnValue
 }
 ```
+
+Here we send a result back to the sender - as described above we do this via string pointer.
 
 ### The Randomization Logic
 
@@ -282,6 +317,8 @@ func shuffleWithSeed(items []string, seed uint64) []string {
     return result
 }
 ```
+
+There are other ways to find a determistic "random" result but that is the most simple in my opinion.
 
 ---
 
@@ -359,7 +396,7 @@ func TestFlip(t *testing.T) {
 
 **ContractTest**: Creates an isolated test environment with its own state.
 
-**Deposit**: Funds test accounts. Required if your contract handles assets.
+**Deposit**: Funds test accounts. Required if your contract handles assets - here we do not need it.
 
 **RegisterContract**: Deploys your WASM code with a contract ID and owner.
 
@@ -368,6 +405,8 @@ func TestFlip(t *testing.T) {
 **Call**: Executes a contract function and returns:
 - `callResult`: Success status, return value, RC (resource credits) used
 - `logsMap`: Event logs emitted by the contract
+
+In the end we assert the test to be successful.
 
 ### Running Tests
 
@@ -383,6 +422,8 @@ Example output:
     contract_test.go:45: Logs: [flip;sender:hive:flipuser;result:meno|ph1102|tibfox|stevenson7]
 --- PASS: TestFlip (0.12s)
 ```
+
+For bigger test files and continous testing it is better to run `go test ./test` as this only gives you "ok" or failure details back.
 
 ---
 
@@ -409,7 +450,7 @@ The compiled `.wasm` file goes in the `artifacts/` directory.
 
 ### Optimizing Binary Size
 
-Strip metadata to reduce file size before deployment (also mandatory for contract verification):
+Next we strip metadata to reduce file size even more before deployment (also mandatory for contract verification):
 
 ```bash
 # Using Wabt
@@ -423,14 +464,13 @@ wasm-tools strip -o artifacts/main-stripped.wasm artifacts/main.wasm
 
 ## Part 5: Deployment
 
-Once tested, deploy your contract to the network using the `vsc-contract-deploy` CLI tool. 
+Once tested, we can finally deploy our contract to the network. For this we have some requirements: 
 
 ### Prerequisites
 
 - A Hive account with at least **10 HBD** (deployment fee per contract)
-- Your Hive active key
-- `vsc-contract-deploy` needs to be built by you: 
-
+- Your Hive private active key
+- `vsc-contract-deploy` needs to be built by you:
 ```
 git clone https://github.com/vsc-eco/go-vsc-node
 cd go-vsc-node
@@ -438,7 +478,11 @@ go mod download
 go build -buildvcs=false -o vsc-contract-deploy vsc-node/cmd/contract-deployer
 ```
 
-This will generate an program called `vsc-contract-deploy` in the root folder. For the upcoming commands I assume that you placed it in your PATH directory like /usr/bin on Linux for example.
+This will generate a program called `vsc-contract-deploy` in the root folder. For the upcoming commands I assume that you placed it in your PATH directory like /usr/bin on Linux for example.
+
+
+There is a deployment fee of **10 HBD** per contract, paid from your **Hive account** balance. This fee is needed to secure the system and let people think twice before deploying unfinished contracts. I learned that the hard way ;) 
+
 
 ### Step 1: Initialize Configuration
 
@@ -455,6 +499,8 @@ This creates `data/config/identityConfig.json`. Edit it with your Hive username 
 }
 ```
 
+
+
 ### Step 2: Deploy the Contract
 
 ```bash
@@ -466,15 +512,14 @@ The CLI will:
 2. Register the contract on-chain
 3. Return your **contract ID** for future calls
 
-### Deployment Cost
+For my previous contracts techcoderx took the name for a display name in[Magi Blocks](https://vsc.techcoderx.com/contracts)
 
-There is a deployment fee of **10 HBD** per contract, paid from your **Hive account** balance. This fee is needed to secure the system and let people think twice before deploying unfinished contracts. I learned that the hard way ;) 
 
 ---
 
 ## Part 6: Calling Your Deployed Contract
 
-Once deployed, you can interact with your contract using the contrat page of [Magi Blocks](https://vsc.techcoderx.com/contracts).  Select your newly deployed contract and open the tab "Call Contract". Enter the following parameters:
+Once deployed, you can interact with your contract using the contract page on [Magi Blocks](https://vsc.techcoderx.com/contracts). Select your newly deployed contract and open the tab "Call Contract". Enter the following parameters:
 
 |Field|Input|
 |-|-|
@@ -484,9 +529,9 @@ Once deployed, you can interact with your contract using the contrat page of [Ma
 |Key Type|`Active`|
 
 
-Hit "Call Contract" and go back to "Transactions" - there you should see your sent transaction. Click on that, wait until it says "confirmed" and inspect the "Call Output".
+Hit "Call Contract" and go back to "Transactions" - there you should see your sent transaction. Click on that, wait until it says "confirmed" and inspect the "Call Output" or the "Logs" to see the flipped results.
 
-**This is the moment you can be proud and tell your freidnds about your success ;)**
+**This is the moment you can be proud! Tell your freinds & family about your big success ;)**
 
 
 ---
@@ -495,14 +540,18 @@ Hit "Call Contract" and go back to "Transactions" - there you should see your se
 
 To allow others to inspect your contract's source code, verify it on the [Magi Blocks](https://vsc.techcoderx.com).
 
-For this our code needs to be published as public github repository. Also the source code needs to be 100% the same as your deployed version. The contract verifier will download and build your contract. Then it will uses the wasm tools you have selected to strip the wasm file. It is **important** that you select the correct versions and tools for the verifier to succeed.
+For this our code needs to be published as public github repository. Also the source code needs to be 100% the same as your deployed version. The contract verifier will download and build your contract. Then it will use the wasm tools you have selected to strip the wasm file too. It is **important** that you select the correct versions and tools for the verifier to succeed.
 
 Go on "Tools" -> "Verify Contract" -> read the explainer and hit "Next".
-Enter all the details in there and hit "submit". The contract should get verified if you met all the requirements. If not @techcoderx can help you as he did help me multiple times. 
 
+Enter all the details in there and hit "submit". The contract should get verified if you met all the requirements. 
+If not @techcoderx can help you as he did help me multiple times. 
 
 ---
 
 ## We made it!
 
 Now you have all infos you need in order to build your own smart contracts on the Magi network! There is still plenty to learn for you from the Go language in general, optimization of gas consumption and much much more. It is a fun journey and I am excited about wht you are going to build! If you want your contracts to get featured on okinoko.io - please contact me!
+
+Also keep an eye out for upcoming videos about the Magi network!
+I am planning to make a deep dive into every single SDK function - let me know if you want to see that or if you have any other topic suggestions.
