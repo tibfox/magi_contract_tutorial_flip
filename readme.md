@@ -1,3 +1,6 @@
+![](https://images.ecency.com/DQmYbUADEYf9Fgqmj11smDngqHNNxQiQpDbC9AefnaPxhqM/colorful_modern_cyber_monday_facebook_cover_1_.png)
+
+
 # Magi Contract Tutorial
 
 You asked for a Magi contract tutorial from start to finish? I got you!
